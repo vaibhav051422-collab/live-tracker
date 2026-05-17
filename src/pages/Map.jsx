@@ -57,6 +57,8 @@ export default function Map() {
   const [participants, setParticipants] = useState([]);
   const [clientId, setClientId] = useState("");
   const [connectionState, setConnectionState] = useState("connecting");
+  const [pingedEmojis, setPingedEmojis] = useState({});
+  const [copyLinkText, setCopyLinkText] = useState("Copy invite link");
   const socketRef = useRef(null);
   const latestLocationRef = useRef(null);
 
@@ -191,6 +193,21 @@ export default function Map() {
 
       if (message.type === "room-state") {
         setParticipants(Array.isArray(message.participants) ? message.participants : []);
+        return;
+      }
+
+      if (message.type === "emoji") {
+        setPingedEmojis(prev => ({ ...prev, [message.clientId]: message.emoji }));
+        setTimeout(() => {
+          setPingedEmojis(prev => {
+            const next = { ...prev };
+            if (next[message.clientId] === message.emoji) {
+              delete next[message.clientId];
+            }
+            return next;
+          });
+        }, 3000);
+        return;
       }
 
       if (message.type === "error") {
@@ -286,10 +303,11 @@ export default function Map() {
     return [participant.latitude + jitterLat, participant.longitude + jitterLng];
   };
 
-  const createCustomIcon = (color, name, isSelf) => {
+  const createCustomIcon = (color, name, isSelf, emoji) => {
     return L.divIcon({
       className: 'custom-leaflet-marker',
       html: `
+        ${emoji ? `<div style="position: absolute; top: -65px; left: 50%; transform: translateX(-50%); font-size: 1.5rem; background: white; padding: 0.2rem 0.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 10;">${emoji}</div>` : ''}
         <div style="position: relative; width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,0.8); display: grid; place-items: center; box-shadow: 0 12px 24px rgba(20, 33, 43, 0.16); border: 2px solid ${color};">
           <span style="position: absolute; inset: -12px; border-radius: 50%; opacity: 0.8; animation: pulse 1.8s ease-in-out infinite; background: ${color}33"></span>
           <span style="width: 16px; height: 16px; border-radius: 50%; position: relative; z-index: 2; background: ${color}"></span>
@@ -306,6 +324,20 @@ export default function Map() {
   const colors = ["#2563eb", "#f97316", "#0f766e", "#7c3aed", "#b45309"];
 
   const selectedParticipant = activeParticipantList.find((participant) => participant.id === activeParticipantId) || activeParticipantList[0] || selfParticipant;
+
+  const sendEmoji = (emoji) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: "emoji", emoji }));
+    }
+  };
+
+  const handleCopyLink = () => {
+    const link = `${window.location.origin}/code?room=${session.code}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopyLinkText("Copied!");
+      setTimeout(() => setCopyLinkText("Copy invite link"), 2000);
+    });
+  };
 
   const distanceKm = getDistanceFromLatLonInKm(
     selfParticipant.latitude,
@@ -394,7 +426,7 @@ export default function Map() {
                     <Marker 
                       key={participant.id} 
                       position={position}
-                      icon={createCustomIcon(dotColor, participant.name, isSelf)}
+                      icon={createCustomIcon(dotColor, participant.name, isSelf, pingedEmojis[participant.id])}
                       zIndexOffset={activeParticipantId === participant.id ? 1000 : 0}
                       eventHandlers={{
                         click: () => setActiveParticipantId(participant.id)
@@ -446,7 +478,17 @@ export default function Map() {
             {selectedParticipant.id === clientId && geoState.status === "loading" ? <p style={styles.errorText}>Getting your exact location now...</p> : null}
             <p style={styles.statusText}>Connection: {connectionState}. Participants: {activeParticipantList.length}</p>
 
+            <div style={styles.emojiBar}>
+              <button type="button" onClick={() => sendEmoji("👍")} style={styles.emojiButton} title="Okay!">👍</button>
+              <button type="button" onClick={() => sendEmoji("🏃‍♂️")} style={styles.emojiButton} title="On my way!">🏃‍♂️</button>
+              <button type="button" onClick={() => sendEmoji("📍")} style={styles.emojiButton} title="I'm here!">📍</button>
+              <button type="button" onClick={() => sendEmoji("⏳")} style={styles.emojiButton} title="Waiting!">⏳</button>
+            </div>
+
             <div style={styles.footerActions}>
+              <button type="button" onClick={handleCopyLink} style={{...styles.secondaryButton, background: "#1e293b", color: "white", borderColor: "#1e293b"}}>
+                {copyLinkText}
+              </button>
               <button type="button" onClick={() => navigate("/code")} style={styles.secondaryButton}>
                 Join another room
               </button>
@@ -718,6 +760,23 @@ const styles = {
     margin: 0,
     color: "#64748b",
     fontSize: "0.85rem",
+  },
+  emojiBar: {
+    display: "flex",
+    gap: "0.5rem",
+    justifyContent: "space-between",
+    padding: "0.5rem 0",
+  },
+  emojiButton: {
+    fontSize: "1.25rem",
+    padding: "0.5rem",
+    background: "white",
+    border: "1px solid rgba(20, 33, 43, 0.08)",
+    borderRadius: "12px",
+    cursor: "pointer",
+    flex: 1,
+    boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+    transition: "transform 0.1s",
   },
   footerActions: {
     display: "grid",

@@ -1,11 +1,20 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 export default function Code() {
+  const [searchParams] = useSearchParams();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const roomFromUrl = searchParams.get("room");
+    if (roomFromUrl) {
+      const alphanumericOnly = roomFromUrl.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase();
+      setCode(alphanumericOnly);
+    }
+  }, [searchParams]);
 
   const handleCodeChange = (value) => {
     const alphanumericOnly = value.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase();

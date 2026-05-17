@@ -164,6 +164,27 @@ wss.on("connection", (socket) => {
       return;
     }
 
+    if (message.type === "emoji") {
+      const roomCode = String(message.roomCode || socket.roomCode || "").trim().toUpperCase();
+      if (!roomCode) return;
+      
+      const room = rooms.get(roomCode);
+      if (!room || !room.has(socket.id)) return;
+
+      const broadcastMessage = JSON.stringify({
+        type: "emoji",
+        clientId: socket.id,
+        emoji: message.emoji
+      });
+
+      for (const participant of room.values()) {
+        if (participant.socket.readyState === 1) {
+          participant.socket.send(broadcastMessage);
+        }
+      }
+      return;
+    }
+
     if (message.type === "leave") {
       const roomCode = String(message.roomCode || socket.roomCode || "").trim().toUpperCase();
       if (!roomCode) {
