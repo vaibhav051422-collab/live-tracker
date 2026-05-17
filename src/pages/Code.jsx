@@ -8,8 +8,8 @@ export default function Code() {
   const navigate = useNavigate();
 
   const handleCodeChange = (value) => {
-    const digitsOnly = value.replace(/\D/g, "").slice(0, 8);
-    setCode(digitsOnly);
+    const alphanumericOnly = value.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase();
+    setCode(alphanumericOnly);
     if (error) setError("");
   };
 
@@ -29,7 +29,7 @@ export default function Code() {
     }
 
     if (trimmedCode.length < 4) {
-      setError("Room code must be at least 4 digits");
+      setError("Room code must be at least 4 characters");
       return;
     }
 
@@ -251,8 +251,7 @@ export default function Code() {
               <input
                 id="room-code"
                 type="text"
-                inputMode="numeric"
-                placeholder="Enter a 4-digit code"
+                placeholder="Enter a 4-char code"
                 value={code}
                 onChange={(e) => handleCodeChange(e.target.value)}
               />
