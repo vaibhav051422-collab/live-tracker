@@ -1,16 +1,74 @@
-# React + Vite
+# Arena Map
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Arena Map is a React + Vite app for joining a room and sharing live location on a map. It includes a client-side experience for entering a room code and a small Express/WebSocket server that broadcasts room state between connected users.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Join a room with a name and numeric room code.
+- View yourself and other participants on a live Leaflet map.
+- Share location updates in real time over WebSockets.
+- Static pages for privacy, terms, legal, and contact information.
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React 19
+- Vite
+- React Router
+- Leaflet and React Leaflet
+- Express
+- ws
 
-## Expanding the ESLint configuration
+## Project Structure
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- `src/main.jsx` - application entry point and route setup.
+- `src/pages/LandingPage.jsx` - marketing landing page.
+- `src/pages/Code.jsx` - room code and name entry form.
+- `src/pages/Map.jsx` - live map and participant tracking.
+- `server.js` - Express + WebSocket room server.
+
+## Getting Started
+
+### Install dependencies
+
+```bash
+npm install
+```
+
+### Run the app in development
+
+```bash
+npm run dev
+```
+
+This starts Vite for the frontend and `server.js` for the websocket backend.
+
+### Build for production
+
+```bash
+npm run build
+```
+
+### Preview the production build
+
+```bash
+npm run preview
+```
+
+### Start the room server only
+
+```bash
+npm start
+```
+
+## Configuration
+
+The app uses these environment values when available:
+
+- `VITE_ROOM_SERVER_URL` - websocket URL used by the map page.
+- `PORT` or `ROOM_SERVER_PORT` - port for the room server, defaulting to `3001`.
+
+## Notes
+
+- The map page stores the last joined room locally in the browser.
+- Geolocation permission is required to publish your live position.
+- The server serves the built frontend from `dist` in production.
