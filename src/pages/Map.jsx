@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 const STORAGE_KEY = "arena-room-session";
 
@@ -17,6 +20,16 @@ function buildFallbackSession() {
     name: "Guest",
     code: "0000",
   };
+}
+
+function MapRecenter({ center }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.setView([center.latitude, center.longitude], map.getZoom(), { animate: true });
+    }
+  }, [center, map]);
+  return null;
 }
 
 export default function Map() {
@@ -241,25 +254,36 @@ export default function Map() {
     };
   }, [activeParticipantList]);
 
-  const projectParticipant = (participant, index) => {
-    if (participant.latitude === null || participant.longitude === null || !mapCenter) {
-      return {
-        left: `${45 + index * 4}%`,
-        top: `${52 + index * 3}%`,
-      };
+  const getParticipantPosition = (participant, index) => {
+    if (participant.latitude === null || participant.longitude === null) {
+      // If no location, fallback to London coords or map center with wide offset
+      const baseLat = mapCenter ? mapCenter.latitude : 51.505;
+      const baseLng = mapCenter ? mapCenter.longitude : -0.09;
+      return [baseLat + (index * 0.01), baseLng + (index * 0.01)];
     }
 
-    const latitudeOffset = (participant.latitude - mapCenter.latitude) * 900;
-    const longitudeOffset = (participant.longitude - mapCenter.longitude) * 900;
+    // Tiny jitter (~5 meters) to prevent exact overlaps when testing from same device
+    const jitterLat = (index % 5) * 0.00005 - 0.0001;
+    const jitterLng = Math.floor(index / 5) * 0.00005 - 0.00005;
 
-    // Add a tiny jitter to prevent perfect overlap when testing from the same device
-    const jitterX = (index % 5) * 1.5 - 3;
-    const jitterY = Math.floor(index / 5) * 1.5 - 1.5;
+    return [participant.latitude + jitterLat, participant.longitude + jitterLng];
+  };
 
-    return {
-      left: `${Math.max(10, Math.min(90, 50 + longitudeOffset + jitterX))}%`,
-      top: `${Math.max(10, Math.min(90, 50 - latitudeOffset + jitterY))}%`,
-    };
+  const createCustomIcon = (color, name, isSelf) => {
+    return L.divIcon({
+      className: 'custom-leaflet-marker',
+      html: `
+        <div style="position: relative; width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,0.8); display: grid; place-items: center; box-shadow: 0 12px 24px rgba(20, 33, 43, 0.16); border: 2px solid ${color};">
+          <span style="position: absolute; inset: -12px; border-radius: 50%; opacity: 0.8; animation: pulse 1.8s ease-in-out infinite; background: ${color}33"></span>
+          <span style="width: 16px; height: 16px; border-radius: 50%; position: relative; z-index: 2; background: ${color}"></span>
+        </div>
+        <div style="position: absolute; top: -34px; left: 50%; transform: translateX(-50%); padding: 0.3rem 0.65rem; border: 1px solid ${color}33; border-radius: 999px; background: rgba(255,255,255,0.9); font-size: 0.75rem; font-weight: 700; white-space: nowrap; color: #14212b;">
+          ${name || (isSelf ? "You" : "Guest")}
+        </div>
+      `,
+      iconSize: [46, 46],
+      iconAnchor: [23, 23],
+    });
   };
 
   const colors = ["#2563eb", "#f97316", "#0f766e", "#7c3aed", "#b45309"];
@@ -313,30 +337,39 @@ export default function Map() {
               </div>
             </div>
 
-            <div style={styles.mapCanvas}>
-              <div style={styles.mapGrid} />
-              {activeParticipantList.map((participant, index) => {
-                const isSelf = participant.id === clientId || participant.id === "self";
-                const dotColor = colors[index % colors.length];
-                const position = projectParticipant(participant, index);
+            <div style={{...styles.mapCanvas, padding: 0}}>
+              <MapContainer 
+                center={mapCenter ? [mapCenter.latitude, mapCenter.longitude] : [51.505, -0.09]} 
+                zoom={14} 
+                style={{ height: '100%', width: '100%', minHeight: '560px', zIndex: 1 }}
+                zoomControl={false}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+                  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                />
+                <MapRecenter center={mapCenter} />
+                
+                {activeParticipantList.map((participant, index) => {
+                  const isSelf = participant.id === clientId || participant.id === "self";
+                  const dotColor = colors[index % colors.length];
+                  const position = getParticipantPosition(participant, index);
 
-                return (
-                  <div key={participant.id} style={{ ...styles.dotWrap, ...position, zIndex: activeParticipantId === participant.id ? 4 : 3 }}>
-                    <button
-                      type="button"
-                      onClick={() => setActiveParticipantId(participant.id)}
-                      style={{ ...styles.dotButton, borderColor: dotColor }}
-                      aria-label={`${participant.name || (isSelf ? "You" : "Participant")} location`}
-                    >
-                      <span style={{ ...styles.dotPulse, background: `${dotColor}33` }} />
-                      <span style={{ ...styles.dotCore, background: dotColor }} />
-                    </button>
-                    <div style={{ ...styles.dotLabel, borderColor: `${dotColor}33` }}>{participant.name || (isSelf ? "You" : "Guest")}</div>
-                  </div>
-                );
-              })}
+                  return (
+                    <Marker 
+                      key={participant.id} 
+                      position={position}
+                      icon={createCustomIcon(dotColor, participant.name, isSelf)}
+                      zIndexOffset={activeParticipantId === participant.id ? 1000 : 0}
+                      eventHandlers={{
+                        click: () => setActiveParticipantId(participant.id)
+                      }}
+                    />
+                  );
+                })}
+              </MapContainer>
 
-              <div style={styles.mapCorner}>
+              <div style={{...styles.mapCorner, zIndex: 2}}>
                 <div style={styles.cornerTitle}>Legend</div>
                 {activeParticipantList.map((participant, index) => (
                   <div style={styles.cornerRow} key={participant.id}>
