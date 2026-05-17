@@ -15,6 +15,23 @@ function hashCode(value) {
   return Math.abs(hash);
 }
 
+function deg2rad(deg) {
+  return deg * (Math.PI / 180);
+}
+
+function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+  if (lat1 === null || lon1 === null || lat2 === null || lon2 === null) return null;
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+}
+
 function buildFallbackSession() {
   return {
     name: "Guest",
@@ -290,6 +307,24 @@ export default function Map() {
 
   const selectedParticipant = activeParticipantList.find((participant) => participant.id === activeParticipantId) || activeParticipantList[0] || selfParticipant;
 
+  const distanceKm = getDistanceFromLatLonInKm(
+    selfParticipant.latitude,
+    selfParticipant.longitude,
+    selectedParticipant.latitude,
+    selectedParticipant.longitude
+  );
+
+  let distanceString = "Waiting...";
+  if (selectedParticipant.id === selfParticipant.id) {
+    distanceString = "0 m";
+  } else if (distanceKm !== null) {
+    if (distanceKm < 1) {
+      distanceString = `${Math.round(distanceKm * 1000)} m`;
+    } else {
+      distanceString = `${distanceKm.toFixed(2)} km`;
+    }
+  }
+
   return (
     <div style={styles.page}>
       <style>{`
@@ -394,6 +429,7 @@ export default function Map() {
               <div style={styles.locationRow}><span>Latitude</span><strong>{selectedParticipant.latitude !== null ? selectedParticipant.latitude.toFixed(6) : "Waiting..."}</strong></div>
               <div style={styles.locationRow}><span>Longitude</span><strong>{selectedParticipant.longitude !== null ? selectedParticipant.longitude.toFixed(6) : "Waiting..."}</strong></div>
               <div style={styles.locationRow}><span>Accuracy</span><strong>{selectedParticipant.id === clientId && geoState.coords?.accuracy ? `${Math.round(geoState.coords.accuracy)} m` : "Shared"}</strong></div>
+              <div style={styles.locationRow}><span>Distance from you</span><strong>{distanceString}</strong></div>
               <div style={styles.locationRow}><span>Google Maps</span><strong>{selectedParticipant.latitude !== null ? "Live link" : "Unavailable"}</strong></div>
             </div>
 
